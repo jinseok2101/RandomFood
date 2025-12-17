@@ -1,3 +1,5 @@
+// pages/api/places.ts (지역 기반 키워드 검색 로직 적용)
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { Place } from '../../types'; 
