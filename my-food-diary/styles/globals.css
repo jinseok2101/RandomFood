@@ -1,0 +1,25 @@
+/* styles/globals.css */
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 지도가 제대로 보이도록 HTML/Body에 높이를 100%로 설정합니다. */
+#root,
+body,
+html {
+  height: 100%;
+}
