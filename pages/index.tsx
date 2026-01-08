@@ -12,6 +12,13 @@ export default function Home() {
   const [radius, setRadius] = useState(1000);
   const [selectedCategory, setSelectedCategory] = useState("전체");
 
+  // 월드컵 관련 상태
+  const [worldCupMode, setWorldCupMode] = useState(false);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [round, setRound] = useState<any[]>([]);
+  const [winners, setWinners] = useState<any[]>([]);
+  const [currentMatch, setCurrentMatch] = useState<[any, any] | null>(null);
+
   const markersRef = useRef<any[]>([]);
   const markerIds = useRef(new Set());
   const NCP_MAPS_CLIENT_ID = process.env.NEXT_PUBLIC_NCP_MAPS_CLIENT_ID;
@@ -27,7 +34,6 @@ export default function Home() {
     "치킨",
     "패스트푸드",
   ];
-
   const categoryStyles: { [key: string]: string } = {
     한식: "#ff4757",
     일식: "#2e86de",
@@ -40,60 +46,29 @@ export default function Home() {
     기타: "#7f8c8d",
   };
 
-  // 💡 [중요] 카테고리 판별 로직을 하나로 통합
   const checkCategory = (itemCat: string, selectedCat: string) => {
     if (selectedCat === "전체") return true;
-
-    if (selectedCat === "한식") {
-      return ["한식", "김밥", "갈비", "삼겹살", "육류", "고기", "분식"].some(
-        (k) => itemCat.includes(k)
-      );
-    }
-    if (selectedCat === "일식") {
-      return ["일식", "스시", "초밥", "돈가스", "돈까스"].some((k) =>
-        itemCat.includes(k)
-      );
-    }
-    if (selectedCat === "중식") {
-      return ["중식", "짜장", "짬뽕", "마라탕"].some((k) =>
-        itemCat.includes(k)
-      );
-    }
-    if (selectedCat === "양식") {
-      return ["양식", "파스타", "스테이크"].some((k) => itemCat.includes(k));
-    }
-    if (selectedCat === "카페") {
-      return ["카페", "커피", "빵", "베이커리", "디저트"].some((k) =>
-        itemCat.includes(k)
-      );
-    }
-    if (selectedCat === "분식") {
-      return ["분식", "떡볶이", "오뎅", "어묵", "튀김"].some((k) =>
-        itemCat.includes(k)
-      );
-    }
-    if (selectedCat === "패스트푸드") {
-      return ["햄버거", "버거", "피자", "도넛", "패스트푸드"].some((k) =>
-        itemCat.includes(k)
-      );
-    }
-    return itemCat.includes(selectedCat);
+    const catMap: { [key: string]: string[] } = {
+      한식: ["한식", "김밥", "갈비", "삼겹살", "육류", "고기", "분식"],
+      일식: ["일식", "스시", "초밥", "돈가스", "돈까스"],
+      중식: ["중식", "짜장", "짬뽕", "마라탕"],
+      양식: ["양식", "파스타", "스테이크"],
+      카페: ["카페", "커피", "빵", "베이커리", "디저트"],
+      분식: ["분식", "떡볶이", "오뎅", "어묵", "튀김"],
+      패스트푸드: ["햄버거", "버거", "피자", "도넛", "패스트푸드"],
+    };
+    return (
+      catMap[selectedCat]?.some((k) => itemCat.includes(k)) ||
+      itemCat.includes(selectedCat)
+    );
   };
 
-  // 💡 색상 결정 로직에도 통합 함수 적용
   const getCategoryColor = (category: string) => {
     for (const cat of categories) {
       if (cat !== "전체" && checkCategory(category, cat))
         return categoryStyles[cat];
     }
     return categoryStyles["기타"];
-  };
-
-  const filterMarkers = (category: string) => {
-    markersRef.current.forEach((marker) => {
-      const isVisible = checkCategory(marker.get("category"), category);
-      marker.setMap(isVisible ? mapInstance.current : null);
-    });
   };
 
   const fetchRestaurants = async (map: any) => {
@@ -106,8 +81,6 @@ export default function Home() {
           .split(" ")
           .slice(0, 4)
           .join(" ");
-
-        // 💡 "맛집" 키워드 제거 및 "음식점", "고기" 등 키워드 최적화
         const keywords = [
           "음식점",
           "식당",
@@ -115,10 +88,8 @@ export default function Home() {
           "치킨",
           "분식",
           "고기",
-          "육류",
           "피자",
           "돈가스",
-          "햄버거",
         ];
 
         for (const k of keywords) {
@@ -130,37 +101,45 @@ export default function Home() {
             );
             const items = await res.json();
             if (!Array.isArray(items)) continue;
-
             items.forEach((item: any) => {
               const id = item.title + item.address;
               if (markerIds.current.has(id)) return;
-
-              let mLat =
+              markerIds.current.add(id);
+              const mLat =
                 Number(item.mapy) > 1000
                   ? Number(item.mapy) / 10000000
                   : Number(item.mapy);
-              let mLng =
+              const mLng =
                 Number(item.mapx) > 1000
                   ? Number(item.mapx) / 10000000
                   : Number(item.mapx);
-              const pos = new (window as any).naver.maps.LatLng(mLat, mLng);
-
-              markerIds.current.add(id);
-
-              // 💡 마커 생성 시 현재 선택된 카테고리와 일치하는지 확인 (통합 로직 사용)
-              const isMatch = checkCategory(item.category, selectedCategory);
-
+              const cleanTitle = item.title.replace(/<[^>]*>?/gm, "");
               const marker = new (window as any).naver.maps.Marker({
-                position: pos,
-                map: isMatch ? map : null,
+                position: new (window as any).naver.maps.LatLng(mLat, mLng),
+                map: checkCategory(item.category, selectedCategory)
+                  ? map
+                  : null,
                 icon: {
                   content: `<div style="width:14px; height:14px; background:${getCategoryColor(
                     item.category
-                  )}; border:2px solid white; border-radius:50%; box-shadow:0 0 5px rgba(0,0,0,0.2);"></div>`,
+                  )}; border:2px solid white; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.3); cursor:pointer;"></div>`,
                   anchor: new (window as any).naver.maps.Point(7, 7),
                 },
               });
-              marker.set("title", item.title.replace(/<[^>]*>?/gm, ""));
+              (window as any).naver.maps.Event.addListener(
+                marker,
+                "click",
+                () => {
+                  setPickedStore({
+                    title: cleanTitle,
+                    category: item.category,
+                    url: `https://map.naver.com/v5/search/${encodeURIComponent(
+                      cleanTitle
+                    )}`,
+                  });
+                }
+              );
+              marker.set("title", cleanTitle);
               marker.set("category", item.category);
               markersRef.current.push(marker);
             });
@@ -172,76 +151,108 @@ export default function Home() {
     );
   };
 
-  // ... (rollMenu, moveToMyLocation, useEffect 로직은 동일)
+  // 🏆 월드컵 시작 로직
+  const startWorldCup = () => {
+    const center = mapInstance.current?.getCenter();
+    const available = markersRef.current
+      .filter(
+        (m) =>
+          m.getMap() !== null &&
+          mapInstance.current
+            .getProjection()
+            .getDistance(center, m.getPosition()) <= radius
+      )
+      .map((m) => ({
+        title: m.get("title"),
+        category: m.get("category"),
+        url: `https://map.naver.com/v5/search/${encodeURIComponent(
+          m.get("title")
+        )}`,
+      }));
+
+    if (available.length < 4)
+      return alert(
+        "월드컵을 하려면 주변에 식당이 최소 4개 이상 있어야 합니다."
+      );
+
+    const shuffled = available.sort(() => 0.5 - Math.random()).slice(0, 8); // 최대 8강
+    setCandidates(shuffled);
+    setRound(shuffled);
+    setWinners([]);
+    setCurrentMatch([shuffled[0], shuffled[1]]);
+    setWorldCupMode(true);
+  };
+
+  const selectWinner = (winner: any) => {
+    const nextWinners = [...winners, winner];
+    setWinners(nextWinners);
+
+    if (round.length <= 2) {
+      if (nextWinners.length === 1) {
+        // 최종 우승
+        setPickedStore(winner);
+        setWorldCupMode(false);
+      } else {
+        // 다음 라운드 진출
+        const nextRound = nextWinners;
+        setRound(nextRound);
+        setWinners([]);
+        setCurrentMatch([nextRound[0], nextRound[1]]);
+      }
+    } else {
+      const nextRound = round.slice(2);
+      setRound(nextRound);
+      setCurrentMatch([nextRound[0], nextRound[1]]);
+    }
+  };
+
   const rollMenu = () => {
     const center = mapInstance.current?.getCenter();
-    const availableMarkers = markersRef.current.filter((m) => {
-      if (!center) return false;
-      const isVisible = m.getMap() !== null;
-      return (
-        isVisible &&
+    const available = markersRef.current.filter(
+      (m) =>
+        m.getMap() !== null &&
         mapInstance.current
           .getProjection()
           .getDistance(center, m.getPosition()) <= radius
-      );
-    });
-
-    if (availableMarkers.length === 0)
-      return alert(`${selectedCategory} 주변에 음식점이 없습니다.`);
-
+    );
+    if (available.length === 0) return alert("주변에 음식점이 없습니다.");
     setIsRolling(true);
     setPickedStore(null);
-
     let count = 0;
     const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * availableMarkers.length);
-      const tempTarget = availableMarkers[randomIndex];
-      mapInstance.current?.panTo(tempTarget.getPosition());
-      count++;
-      if (count > 20) {
+      const target = available[Math.floor(Math.random() * available.length)];
+      mapInstance.current?.panTo(target.getPosition());
+      if (++count > 20) {
         clearInterval(interval);
         setIsRolling(false);
-        const finalTarget = availableMarkers[randomIndex];
         setPickedStore({
-          title: finalTarget.get("title"),
-          category: finalTarget.get("category"),
+          title: target.get("title"),
+          category: target.get("category"),
           url: `https://map.naver.com/v5/search/${encodeURIComponent(
-            finalTarget.get("title")
+            target.get("title")
           )}`,
         });
       }
     }, 120);
   };
 
-  const moveToMyLocation = () => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const myPos = new (window as any).naver.maps.LatLng(
-        pos.coords.latitude,
-        pos.coords.longitude
-      );
-      mapInstance.current.setCenter(myPos);
-      if (myMarkerRef.current) myMarkerRef.current.setPosition(myPos);
-      fetchRestaurants(mapInstance.current);
-    });
-  };
-
   useEffect(() => {
     if (!scriptLoaded || !window.naver || mapInstance.current) return;
     const map = new (window as any).naver.maps.Map(mapRef.current!, {
-      center: new (window as any).naver.maps.LatLng(37.554678, 126.970606),
+      center: new (window as any).naver.maps.LatLng(37.5546, 126.9706),
       zoom: 17,
     });
     mapInstance.current = map;
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      (p) => {
         const myPos = new (window as any).naver.maps.LatLng(
-          position.coords.latitude,
-          position.coords.longitude
+          p.coords.latitude,
+          p.coords.longitude
         );
         map.setCenter(myPos);
         myMarkerRef.current = new (window as any).naver.maps.Marker({
           position: myPos,
-          map: map,
+          map,
           zIndex: 100,
           icon: {
             content: `<div style="width:20px; height:20px; background:#007bff; border:3px solid white; border-radius:50%;"></div>`,
@@ -267,159 +278,288 @@ export default function Home() {
         height: "100vh",
         overflow: "hidden",
         fontFamily: "sans-serif",
+        backgroundColor: "#f0f2f5",
       }}
     >
       <Head>
         <title>오늘 뭐 먹지?</title>
       </Head>
-      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
-
       <div
+        ref={mapRef}
         style={{
-          position: "absolute",
-          top: "20px",
-          left: "20px",
-          zIndex: 100,
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
+          width: "100%",
+          height: "100%",
+          visibility: worldCupMode ? "hidden" : "visible",
         }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: "5px",
-            background: "white",
-            padding: "5px",
-            borderRadius: "15px",
-            boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-          }}
-        >
-          {[500, 1000, 3000].map((r) => (
-            <button
-              key={r}
-              onClick={() => {
-                setRadius(r);
-                markerIds.current.clear();
-                markersRef.current.forEach((m) => m.setMap(null));
-                markersRef.current = [];
-                fetchRestaurants(mapInstance.current);
-              }}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "10px",
-                border: "none",
-                background: radius === r ? "#ff4757" : "none",
-                color: radius === r ? "white" : "#555",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              {r >= 1000 ? `${r / 1000}km` : `${r}m`}
-            </button>
-          ))}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: "5px",
-            background: "white",
-            padding: "5px",
-            borderRadius: "15px",
-            boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-            flexWrap: "wrap",
-            maxWidth: "280px",
-          }}
-        >
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                setSelectedCategory(cat);
-                filterMarkers(cat);
-              }}
-              style={{
-                padding: "6px 10px",
-                borderRadius: "8px",
-                border: "none",
-                background: selectedCategory === cat ? "#333" : "#f1f1f1",
-                color: selectedCategory === cat ? "white" : "#555",
-                fontSize: "12px",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
+      />
 
-      <div
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "75px",
-          zIndex: 100,
-          background: "white",
-          padding: "10px 15px",
-          borderRadius: "15px",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-          fontSize: "11px",
-        }}
-      >
+      {/* 월드컵 UI */}
+      {worldCupMode && currentMatch && (
         <div
           style={{
-            fontWeight: "bold",
-            marginBottom: "8px",
-            borderBottom: "1px solid #eee",
-            paddingBottom: "4px",
+            position: "absolute",
+            inset: 0,
+            zIndex: 2000,
+            display: "flex",
+            backgroundColor: "#fff",
           }}
         >
-          범례
-        </div>
-        {Object.entries(categoryStyles).map(([name, color]) => (
           <div
-            key={name}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "4px",
+              position: "absolute",
+              top: "40px",
+              width: "100%",
+              textAlign: "center",
+              zIndex: 10,
             }}
           >
             <div
               style={{
-                width: "10px",
-                height: "100%",
-                aspectRatio: "1/1",
-                background: color,
-                borderRadius: "50%",
+                background: "#333",
+                color: "#fff",
+                display: "inline-block",
+                padding: "10px 25px",
+                borderRadius: "30px",
+                fontWeight: "bold",
+                fontSize: "18px",
               }}
-            ></div>
-            <span style={{ color: "#444" }}>{name}</span>
+            >
+              {winners.length + 1} /{" "}
+              {Math.ceil((round.length + winners.length) / 2)} 대결
+            </div>
           </div>
-        ))}
-      </div>
+          {currentMatch.map((store, idx) => (
+            <div
+              key={idx}
+              onClick={() => selectWinner(store)}
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                borderRight: idx === 0 ? "2px solid #eee" : "none",
+                position: "relative",
+                padding: "20px",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#fdf2f2")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "#fff")
+              }
+            >
+              <div
+                style={{
+                  background: getCategoryColor(store.category),
+                  color: "#fff",
+                  padding: "6px 15px",
+                  borderRadius: "20px",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  marginBottom: "15px",
+                }}
+              >
+                {store.category.split(">").pop()}
+              </div>
+              <h2
+                style={{
+                  fontSize: "28px",
+                  fontWeight: "black",
+                  textAlign: "center",
+                  wordBreak: "keep-all",
+                }}
+              >
+                {store.title}
+              </h2>
+              {idx === 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    right: "-30px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "#fff",
+                    border: "2px solid #eee",
+                    width: "60px",
+                    height: "60px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: "bold",
+                    fontSize: "20px",
+                    color: "#ff4757",
+                    zIndex: 20,
+                  }}
+                >
+                  VS
+                </div>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={() => setWorldCupMode(false)}
+            style={{
+              position: "absolute",
+              bottom: "40px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "none",
+              border: "none",
+              color: "#888",
+              textDecoration: "underline",
+              cursor: "pointer",
+            }}
+          >
+            그만하기
+          </button>
+        </div>
+      )}
 
-      <button
-        onClick={moveToMyLocation}
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "20px",
-          zIndex: 100,
-          width: "45px",
-          height: "45px",
-          background: "white",
-          border: "none",
-          borderRadius: "12px",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-          cursor: "pointer",
-        }}
-      >
-        🎯
-      </button>
+      {!worldCupMode && (
+        <>
+          {/* 상단 UI */}
+          <div
+            style={{
+              position: "absolute",
+              top: "20px",
+              left: "20px",
+              zIndex: 100,
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: "5px",
+                background: "white",
+                padding: "5px",
+                borderRadius: "15px",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+              }}
+            >
+              {[500, 1000, 3000].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => {
+                    setRadius(r);
+                    markerIds.current.clear();
+                    markersRef.current.forEach((m) => m.setMap(null));
+                    markersRef.current = [];
+                    fetchRestaurants(mapInstance.current);
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: radius === r ? "#ff4757" : "none",
+                    color: radius === r ? "white" : "#555",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  {r >= 1000 ? `${r / 1000}km` : `${r}m`}
+                </button>
+              ))}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "5px",
+                background: "white",
+                padding: "5px",
+                borderRadius: "15px",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+                flexWrap: "wrap",
+                maxWidth: "280px",
+              }}
+            >
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    markersRef.current.forEach((m) =>
+                      m.setMap(
+                        checkCategory(m.get("category"), cat)
+                          ? mapInstance.current
+                          : null
+                      )
+                    );
+                  }}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: selectedCategory === cat ? "#333" : "#f1f1f1",
+                    color: selectedCategory === cat ? "white" : "#555",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 메인 액션 버튼 */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "40px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 100,
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+              width: "85%",
+              maxWidth: "400px",
+            }}
+          >
+            <button
+              onClick={startWorldCup}
+              style={{
+                height: "55px",
+                borderRadius: "15px",
+                border: "none",
+                background: "#333",
+                color: "white",
+                fontSize: "18px",
+                fontWeight: "bold",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+                cursor: "pointer",
+              }}
+            >
+              🏆 점심 메뉴 월드컵 시작
+            </button>
+            <button
+              onClick={rollMenu}
+              disabled={isRolling}
+              style={{
+                height: "65px",
+                borderRadius: "20px",
+                border: "none",
+                background: isRolling ? "#ccc" : "#ff4757",
+                color: "white",
+                fontSize: "20px",
+                fontWeight: "bold",
+                boxShadow: "0 8px 25px rgba(255, 71, 87, 0.4)",
+                cursor: "pointer",
+              }}
+            >
+              {isRolling ? "고르는 중..." : `🎲 ${selectedCategory} 랜덤 뽑기`}
+            </button>
+          </div>
+        </>
+      )}
 
       {pickedStore && (
         <div
@@ -428,16 +568,26 @@ export default function Home() {
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            width: "80%",
-            maxWidth: "320px",
+            width: "85%",
+            maxWidth: "340px",
             background: "white",
             padding: "30px",
             borderRadius: "25px",
             boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
-            zIndex: 1000,
+            zIndex: 3000,
             textAlign: "center",
           }}
         >
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: "bold",
+              color: "#ff4757",
+              marginBottom: "5px",
+            }}
+          >
+            {worldCupMode ? "" : "오늘의 추천!"}
+          </div>
           <span
             style={{
               display: "inline-block",
@@ -454,7 +604,7 @@ export default function Home() {
           </span>
           <h2
             style={{
-              fontSize: "20px",
+              fontSize: "24px",
               marginBottom: "8px",
               fontWeight: "bold",
             }}
@@ -462,7 +612,7 @@ export default function Home() {
             {pickedStore.title}
           </h2>
           <div
-            style={{ fontSize: "12px", color: "#888", marginBottom: "25px" }}
+            style={{ fontSize: "13px", color: "#888", marginBottom: "30px" }}
           >
             {pickedStore.category.replace(/>/g, " > ")}
           </div>
@@ -471,10 +621,10 @@ export default function Home() {
               onClick={() => setPickedStore(null)}
               style={{
                 flex: 1,
-                padding: "12px",
-                borderRadius: "12px",
-                border: "1px solid #ddd",
-                background: "white",
+                padding: "14px",
+                borderRadius: "15px",
+                border: "1px solid #eee",
+                background: "#f8f9fa",
                 cursor: "pointer",
               }}
             >
@@ -489,11 +639,12 @@ export default function Home() {
                 background: "#03C75A",
                 color: "white",
                 textDecoration: "none",
-                padding: "12px",
-                borderRadius: "12px",
+                padding: "14px",
+                borderRadius: "15px",
                 fontWeight: "bold",
-                display: "block",
-                fontSize: "14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               길찾기
@@ -501,36 +652,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      <div
-        style={{
-          position: "absolute",
-          bottom: "50px",
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-          zIndex: 100,
-        }}
-      >
-        <button
-          onClick={rollMenu}
-          disabled={isRolling}
-          style={{
-            width: "220px",
-            height: "65px",
-            borderRadius: "35px",
-            border: "none",
-            background: isRolling ? "#ccc" : "#ff4757",
-            color: "white",
-            fontSize: "20px",
-            fontWeight: "bold",
-            boxShadow: "0 8px 25px rgba(255, 71, 87, 0.4)",
-            cursor: "pointer",
-          }}
-        >
-          {isRolling ? "고르는 중..." : `🎲 ${selectedCategory} 뽑기`}
-        </button>
-      </div>
 
       {NCP_MAPS_CLIENT_ID && (
         <Script
