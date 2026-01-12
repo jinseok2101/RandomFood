@@ -17,12 +17,11 @@
 
 ## 🛠 사용 기술
 
-- **Framework**: Next.js (React)
-- **Language**: TypeScript
-- **Styling**: Inline CSS (React CSSProperties)
-- **Map API**: NAVER Maps JavaScript API v3
-- **Search API**: NAVER Search API (Local/Image)
-- **Deployment**: Vercel
+- **프레임워크**: Next.js (React)
+- **언어**: TypeScript
+- **지도 API**: NAVER Maps JavaScript API v3
+- **검색 API**: NAVER Search API (Local/Image)
+- **배포**: Vercel
 
 ## 📖 사용 방법
 
