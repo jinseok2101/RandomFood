@@ -3,7 +3,7 @@
 "오늘 점심 뭐 먹지?" 고민을 해결해주는 네이버 지도 기반 음식점 랜덤 추천 및 월드컵 서비스입니다. 내 주변의 실제 식당 데이터를 바탕으로 랜덤 뽑기와 16강 월드컵을 즐겨보세요!
 
 ## 🚀 바로가기
-**[🔗 서비스 접속하기 (Vercel 배포 주소)](https://random-food-nine.vercel.app/)**
+**[🔗 서비스 접속하기 ](https://random-food-nine.vercel.app/)**
 
 ---
 
@@ -32,15 +32,3 @@
    - 하단의 **[랜덤 뽑기]** 버튼을 누르면 지도 위의 한 곳으로 화면이 이동하며 팝업이 뜹니다.
    - **[월드컵 시작]** 버튼을 누르면 현재 지도에 표시된 식당들로 대결이 시작됩니다.
 4. **상세 정보**: 결정된 식당의 [길찾기] 버튼을 누르면 네이버 지도로 연결됩니다.
-
-## ⚙️ 환경 변수 설정 (.env)
-
-이 프로젝트를 로컬에서 실행하거나 배포할 때는 다음 API 키가 필요합니다.
-
-```env
-# Naver Cloud Platform (Maps)
-NEXT_PUBLIC_NCP_MAPS_CLIENT_ID=your_id
-
-# Naver Developers (Search)
-NAVER_SEARCH_CLIENT_ID=your_id
-NAVER_SEARCH_CLIENT_SECRET=your_secret
