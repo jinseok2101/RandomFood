@@ -1,82 +1,93 @@
 import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
 import Script from "next/script";
+import { CATEGORIES } from "../constants/MapConstants";
+import {
+  checkCategory,
+  getCategoryColor,
+  getCleanTitle,
+} from "../utils/MapUtils";
+import { WorldCupOverlay } from "../components/WorldCupOverlay";
+import { useWorldCup } from "../hooks/useWorldCup";
+
+const CATEGORY_IMAGES: { [key: string]: string } = {
+  한식: "/images/korean.jpg",
+  일식: "/images/japanese.jpg",
+  중식: "/images/chinese.jpg",
+  양식: "/images/western.jpg",
+  카페: "/images/cafe.jpg",
+  치킨: "/images/chicken.jpg",
+  분식: "/images/tteokbokki.jpg",
+  고기: "/images/meat.jpg",
+  피자: "/images/pizza.jpg",
+  패스트푸드: "/images/fastfood.jpg",
+  default: "/images/default.jpg",
+};
 
 export default function Home() {
-  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const myMarkerRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const markerIds = useRef(new Set());
+
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
   const [pickedStore, setPickedStore] = useState<any>(null);
   const [radius, setRadius] = useState(1000);
   const [selectedCategory, setSelectedCategory] = useState("전체");
 
-  // 월드컵 관련 상태
-  const [worldCupMode, setWorldCupMode] = useState(false);
-  const [candidates, setCandidates] = useState<any[]>([]);
-  const [round, setRound] = useState<any[]>([]);
-  const [winners, setWinners] = useState<any[]>([]);
-  const [currentMatch, setCurrentMatch] = useState<[any, any] | null>(null);
+  const {
+    worldCupMode,
+    setWorldCupMode,
+    currentMatch,
+    startWorldCup,
+    selectWinner,
+    roundInfo,
+  } = useWorldCup();
 
-  const markersRef = useRef<any[]>([]);
-  const markerIds = useRef(new Set());
   const NCP_MAPS_CLIENT_ID = process.env.NEXT_PUBLIC_NCP_MAPS_CLIENT_ID;
 
-  const categories = [
-    "전체",
-    "한식",
-    "일식",
-    "중식",
-    "양식",
-    "카페",
-    "분식",
-    "치킨",
-    "패스트푸드",
-  ];
-  const categoryStyles: { [key: string]: string } = {
-    한식: "#ff4757",
-    일식: "#2e86de",
-    중식: "#228f02",
-    양식: "#f39c12",
-    카페: "#6d4c41",
-    분식: "#eb4d4b",
-    치킨: "#e67e22",
-    패스트푸드: "#ff6b6b",
-    기타: "#7f8c8d",
-  };
+  // ⭐ 카테고리 텍스트를 분석하여 적절한 이미지를 반환하는 함수
+  const getFallbackImage = (category: string) => {
+    if (category.includes("한식")) return CATEGORY_IMAGES["한식"];
+    if (category.includes("일식") || category.includes("돈가스"))
+      return CATEGORY_IMAGES["일식"];
+    if (category.includes("중식")) return CATEGORY_IMAGES["중식"];
+    if (
+      category.includes("양식") ||
+      category.includes("이탈리아") ||
+      category.includes("스테이크")
+    )
+      return CATEGORY_IMAGES["양식"];
+    if (
+      category.includes("카페") ||
+      category.includes("커피") ||
+      category.includes("베이커리")
+    )
+      return CATEGORY_IMAGES["카페"];
+    if (category.includes("치킨")) return CATEGORY_IMAGES["치킨"];
+    if (category.includes("분식")) return CATEGORY_IMAGES["분식"];
+    if (category.includes("피자")) return CATEGORY_IMAGES["피자"];
+    if (
+      category.includes("육류") ||
+      category.includes("고기") ||
+      category.includes("곱창")
+    )
+      return CATEGORY_IMAGES["고기"];
+    if (category.includes("햄버거") || category.includes("패스트푸드"))
+      return CATEGORY_IMAGES["패스트푸드"];
 
-  const checkCategory = (itemCat: string, selectedCat: string) => {
-    if (selectedCat === "전체") return true;
-    const catMap: { [key: string]: string[] } = {
-      한식: ["한식", "김밥", "갈비", "삼겹살", "육류", "고기", "분식"],
-      일식: ["일식", "스시", "초밥", "돈가스", "돈까스"],
-      중식: ["중식", "짜장", "짬뽕", "마라탕"],
-      양식: ["양식", "파스타", "스테이크"],
-      카페: ["카페", "커피", "빵", "베이커리", "디저트"],
-      분식: ["분식", "떡볶이", "오뎅", "어묵", "튀김"],
-      패스트푸드: ["햄버거", "버거", "피자", "도넛", "패스트푸드"],
-    };
-    return (
-      catMap[selectedCat]?.some((k) => itemCat.includes(k)) ||
-      itemCat.includes(selectedCat)
-    );
-  };
-
-  const getCategoryColor = (category: string) => {
-    for (const cat of categories) {
-      if (cat !== "전체" && checkCategory(category, cat))
-        return categoryStyles[cat];
-    }
-    return categoryStyles["기타"];
+    return CATEGORY_IMAGES["default"];
   };
 
   const fetchRestaurants = async (map: any) => {
     const center = map.getCenter();
-    (window as any).naver.maps.Service.reverseGeocode(
+    window.naver.maps.Service.reverseGeocode(
       { coords: center },
       async (status: any, response: any) => {
-        if (status !== (window as any).naver.maps.Service.Status.OK) return;
+        if (status !== window.naver.maps.Service.Status.OK) return;
+
         const address = response.v2.address.jibunAddress
           .split(" ")
           .slice(0, 4)
@@ -101,10 +112,12 @@ export default function Home() {
             );
             const items = await res.json();
             if (!Array.isArray(items)) continue;
+
             items.forEach((item: any) => {
               const id = item.title + item.address;
               if (markerIds.current.has(id)) return;
               markerIds.current.add(id);
+
               const mLat =
                 Number(item.mapy) > 1000
                   ? Number(item.mapy) / 10000000
@@ -113,9 +126,13 @@ export default function Home() {
                 Number(item.mapx) > 1000
                   ? Number(item.mapx) / 10000000
                   : Number(item.mapx);
-              const cleanTitle = item.title.replace(/<[^>]*>?/gm, "");
-              const marker = new (window as any).naver.maps.Marker({
-                position: new (window as any).naver.maps.LatLng(mLat, mLng),
+              const cleanTitle = getCleanTitle(item.title);
+
+              // ⭐ 카테고리에 맞는 기본 이미지 할당
+              const imageUrl = getFallbackImage(item.category);
+
+              const marker = new window.naver.maps.Marker({
+                position: new window.naver.maps.LatLng(mLat, mLng),
                 map: checkCategory(item.category, selectedCategory)
                   ? map
                   : null,
@@ -123,24 +140,24 @@ export default function Home() {
                   content: `<div style="width:14px; height:14px; background:${getCategoryColor(
                     item.category
                   )}; border:2px solid white; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.3); cursor:pointer;"></div>`,
-                  anchor: new (window as any).naver.maps.Point(7, 7),
+                  anchor: new window.naver.maps.Point(7, 7),
                 },
               });
-              (window as any).naver.maps.Event.addListener(
-                marker,
-                "click",
-                () => {
-                  setPickedStore({
-                    title: cleanTitle,
-                    category: item.category,
-                    url: `https://map.naver.com/v5/search/${encodeURIComponent(
-                      cleanTitle
-                    )}`,
-                  });
-                }
-              );
+
+              window.naver.maps.Event.addListener(marker, "click", () => {
+                setPickedStore({
+                  title: cleanTitle,
+                  category: item.category,
+                  imageUrl: imageUrl, // 이미지 추가
+                  url: `https://map.naver.com/v5/search/${encodeURIComponent(
+                    cleanTitle
+                  )}`,
+                });
+              });
+
               marker.set("title", cleanTitle);
               marker.set("category", item.category);
+              marker.set("imageUrl", imageUrl); // 마커 객체에도 저장
               markersRef.current.push(marker);
             });
           } catch (e) {
@@ -149,61 +166,6 @@ export default function Home() {
         }
       }
     );
-  };
-
-  // 🏆 월드컵 시작 로직
-  const startWorldCup = () => {
-    const center = mapInstance.current?.getCenter();
-    const available = markersRef.current
-      .filter(
-        (m) =>
-          m.getMap() !== null &&
-          mapInstance.current
-            .getProjection()
-            .getDistance(center, m.getPosition()) <= radius
-      )
-      .map((m) => ({
-        title: m.get("title"),
-        category: m.get("category"),
-        url: `https://map.naver.com/v5/search/${encodeURIComponent(
-          m.get("title")
-        )}`,
-      }));
-
-    if (available.length < 4)
-      return alert(
-        "월드컵을 하려면 주변에 식당이 최소 4개 이상 있어야 합니다."
-      );
-
-    const shuffled = available.sort(() => 0.5 - Math.random()).slice(0, 8); // 최대 8강
-    setCandidates(shuffled);
-    setRound(shuffled);
-    setWinners([]);
-    setCurrentMatch([shuffled[0], shuffled[1]]);
-    setWorldCupMode(true);
-  };
-
-  const selectWinner = (winner: any) => {
-    const nextWinners = [...winners, winner];
-    setWinners(nextWinners);
-
-    if (round.length <= 2) {
-      if (nextWinners.length === 1) {
-        // 최종 우승
-        setPickedStore(winner);
-        setWorldCupMode(false);
-      } else {
-        // 다음 라운드 진출
-        const nextRound = nextWinners;
-        setRound(nextRound);
-        setWinners([]);
-        setCurrentMatch([nextRound[0], nextRound[1]]);
-      }
-    } else {
-      const nextRound = round.slice(2);
-      setRound(nextRound);
-      setCurrentMatch([nextRound[0], nextRound[1]]);
-    }
   };
 
   const rollMenu = () => {
@@ -215,7 +177,9 @@ export default function Home() {
           .getProjection()
           .getDistance(center, m.getPosition()) <= radius
     );
+
     if (available.length === 0) return alert("주변에 음식점이 없습니다.");
+
     setIsRolling(true);
     setPickedStore(null);
     let count = 0;
@@ -228,6 +192,7 @@ export default function Home() {
         setPickedStore({
           title: target.get("title"),
           category: target.get("category"),
+          imageUrl: target.get("imageUrl"),
           url: `https://map.naver.com/v5/search/${encodeURIComponent(
             target.get("title")
           )}`,
@@ -238,32 +203,35 @@ export default function Home() {
 
   useEffect(() => {
     if (!scriptLoaded || !window.naver || mapInstance.current) return;
-    const map = new (window as any).naver.maps.Map(mapRef.current!, {
-      center: new (window as any).naver.maps.LatLng(37.5546, 126.9706),
+
+    const map = new window.naver.maps.Map(mapRef.current!, {
+      center: new window.naver.maps.LatLng(37.5546, 126.9706),
       zoom: 17,
     });
     mapInstance.current = map;
+
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        const myPos = new (window as any).naver.maps.LatLng(
+        const myPos = new window.naver.maps.LatLng(
           p.coords.latitude,
           p.coords.longitude
         );
         map.setCenter(myPos);
-        myMarkerRef.current = new (window as any).naver.maps.Marker({
+        myMarkerRef.current = new window.naver.maps.Marker({
           position: myPos,
           map,
           zIndex: 100,
           icon: {
             content: `<div style="width:20px; height:20px; background:#007bff; border:3px solid white; border-radius:50%;"></div>`,
-            anchor: new (window as any).naver.maps.Point(10, 10),
+            anchor: new window.naver.maps.Point(10, 10),
           },
         });
         fetchRestaurants(map);
       },
       () => fetchRestaurants(map)
     );
-    (window as any).naver.maps.Event.addListener(map, "idle", () =>
+
+    window.naver.maps.Event.addListener(map, "idle", () =>
       fetchRestaurants(map)
     );
   }, [scriptLoaded]);
@@ -272,10 +240,7 @@ export default function Home() {
     <div
       style={{
         position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
+        inset: 0,
         overflow: "hidden",
         fontFamily: "sans-serif",
         backgroundColor: "#f0f2f5",
@@ -284,6 +249,7 @@ export default function Home() {
       <Head>
         <title>오늘 뭐 먹지?</title>
       </Head>
+
       <div
         ref={mapRef}
         style={{
@@ -293,135 +259,23 @@ export default function Home() {
         }}
       />
 
-      {/* 월드컵 UI */}
       {worldCupMode && currentMatch && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 2000,
-            display: "flex",
-            backgroundColor: "#fff",
+        <WorldCupOverlay
+          currentMatch={currentMatch}
+          roundInfo={roundInfo}
+          onSelect={(winner: any) => {
+            const final = selectWinner(winner);
+            if (final) {
+              setPickedStore(final);
+              setWorldCupMode(false);
+            }
           }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: "40px",
-              width: "100%",
-              textAlign: "center",
-              zIndex: 10,
-            }}
-          >
-            <div
-              style={{
-                background: "#333",
-                color: "#fff",
-                display: "inline-block",
-                padding: "10px 25px",
-                borderRadius: "30px",
-                fontWeight: "bold",
-                fontSize: "18px",
-              }}
-            >
-              {winners.length + 1} /{" "}
-              {Math.ceil((round.length + winners.length) / 2)} 대결
-            </div>
-          </div>
-          {currentMatch.map((store, idx) => (
-            <div
-              key={idx}
-              onClick={() => selectWinner(store)}
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                borderRight: idx === 0 ? "2px solid #eee" : "none",
-                position: "relative",
-                padding: "20px",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#fdf2f2")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "#fff")
-              }
-            >
-              <div
-                style={{
-                  background: getCategoryColor(store.category),
-                  color: "#fff",
-                  padding: "6px 15px",
-                  borderRadius: "20px",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  marginBottom: "15px",
-                }}
-              >
-                {store.category.split(">").pop()}
-              </div>
-              <h2
-                style={{
-                  fontSize: "28px",
-                  fontWeight: "black",
-                  textAlign: "center",
-                  wordBreak: "keep-all",
-                }}
-              >
-                {store.title}
-              </h2>
-              {idx === 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    right: "-30px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "#fff",
-                    border: "2px solid #eee",
-                    width: "60px",
-                    height: "60px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "bold",
-                    fontSize: "20px",
-                    color: "#ff4757",
-                    zIndex: 20,
-                  }}
-                >
-                  VS
-                </div>
-              )}
-            </div>
-          ))}
-          <button
-            onClick={() => setWorldCupMode(false)}
-            style={{
-              position: "absolute",
-              bottom: "40px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: "none",
-              border: "none",
-              color: "#888",
-              textDecoration: "underline",
-              cursor: "pointer",
-            }}
-          >
-            그만하기
-          </button>
-        </div>
+          onClose={() => setWorldCupMode(false)}
+        />
       )}
 
       {!worldCupMode && (
         <>
-          {/* 상단 UI */}
           <div
             style={{
               position: "absolute",
@@ -479,7 +333,7 @@ export default function Home() {
                 maxWidth: "280px",
               }}
             >
-              {categories.map((cat) => (
+              {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => {
@@ -509,7 +363,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 메인 액션 버튼 */}
           <div
             style={{
               position: "absolute",
@@ -525,7 +378,20 @@ export default function Home() {
             }}
           >
             <button
-              onClick={startWorldCup}
+              onClick={() =>
+                startWorldCup(
+                  markersRef.current
+                    .filter((m) => m.getMap() !== null)
+                    .map((m) => ({
+                      title: m.get("title"),
+                      category: m.get("category"),
+                      imageUrl: m.get("imageUrl"),
+                      url: `https://map.naver.com/v5/search/${encodeURIComponent(
+                        m.get("title")
+                      )}`,
+                    }))
+                )
+              }
               style={{
                 height: "55px",
                 borderRadius: "15px",
@@ -571,37 +437,25 @@ export default function Home() {
             width: "85%",
             maxWidth: "340px",
             background: "white",
-            padding: "30px",
+            padding: "25px",
             borderRadius: "25px",
             boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
             zIndex: 3000,
             textAlign: "center",
           }}
         >
+          {/* ⭐ 결과창에도 카테고리 이미지 표시 */}
           <div
             style={{
-              fontSize: "14px",
-              fontWeight: "bold",
-              color: "#ff4757",
-              marginBottom: "5px",
+              width: "100%",
+              height: "180px",
+              backgroundImage: `url(${pickedStore.imageUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              borderRadius: "15px",
+              marginBottom: "15px",
             }}
-          >
-            {worldCupMode ? "" : "오늘의 추천!"}
-          </div>
-          <span
-            style={{
-              display: "inline-block",
-              padding: "4px 12px",
-              borderRadius: "20px",
-              fontSize: "12px",
-              fontWeight: "bold",
-              background: getCategoryColor(pickedStore.category),
-              color: "white",
-              marginBottom: "10px",
-            }}
-          >
-            {pickedStore.category.split(">").pop()}
-          </span>
+          />
           <h2
             style={{
               fontSize: "24px",
@@ -611,11 +465,9 @@ export default function Home() {
           >
             {pickedStore.title}
           </h2>
-          <div
-            style={{ fontSize: "13px", color: "#888", marginBottom: "30px" }}
-          >
+          <p style={{ fontSize: "13px", color: "#888", marginBottom: "25px" }}>
             {pickedStore.category.replace(/>/g, " > ")}
-          </div>
+          </p>
           <div style={{ display: "flex", gap: "10px" }}>
             <button
               onClick={() => setPickedStore(null)}
