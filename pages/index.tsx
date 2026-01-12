@@ -247,7 +247,7 @@ export default function Home() {
       }}
     >
       <Head>
-        <title>오늘 뭐 먹지?</title>
+        <title>오메추</title>
       </Head>
 
       <div
@@ -404,7 +404,7 @@ export default function Home() {
                 cursor: "pointer",
               }}
             >
-              🏆 점심 메뉴 월드컵 시작
+              🏆 메뉴 월드컵 시작
             </button>
             <button
               onClick={rollMenu}
