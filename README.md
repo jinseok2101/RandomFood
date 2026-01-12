@@ -18,10 +18,9 @@
 ## 🛠 기술 스택
 
 ### Frontend & Core
-- **Next.js 14 (App/Pages)**: 고성능 웹 애플리케이션 프레임워크
-- **TypeScript**: 정적 타입을 통한 코드 안정성 및 유지보수성 확보
-- **React Hooks**: `useState`, `useEffect`, `useRef`를 활용한 상태 및 DOM 관리
-- **Custom Hooks**: 월드컵 게임 로직 분리를 위한 `useWorldCup` 구현
+- **Next.js (App/Pages)**: 16.0.7
+- **TypeScript**: 5.9.3
+- **React Hooks**: 19.2.0
 
 ### API & Data
 - **NAVER Maps API (v3)**: 지도 렌더링, 마커 관리, Reverse Geocoding(주소 변환)
