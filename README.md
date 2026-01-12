@@ -15,13 +15,18 @@
 - **🎲 랜덤 뽑기**: 결정 장애를 위해 지도 위의 식당 중 하나를 무작위로 추천합니다.
 - **🏆 메뉴 월드컵**: 주변 맛집들을 모아 16강/8강 월드컵을 진행하여 최종 메뉴를 선정합니다.
 
-## 🛠 사용 기술
+## 🛠 기술 스택
 
-- **프레임워크**: Next.js (React)
-- **언어**: TypeScript
-- **지도 API**: NAVER Maps JavaScript API v3
-- **검색 API**: NAVER Search API (Local/Image)
-- **배포**: Vercel
+### Frontend & Core
+- **Next.js 14 (App/Pages)**: 고성능 웹 애플리케이션 프레임워크
+- **TypeScript**: 정적 타입을 통한 코드 안정성 및 유지보수성 확보
+- **React Hooks**: `useState`, `useEffect`, `useRef`를 활용한 상태 및 DOM 관리
+- **Custom Hooks**: 월드컵 게임 로직 분리를 위한 `useWorldCup` 구현
+
+### API & Data
+- **NAVER Maps API (v3)**: 지도 렌더링, 마커 관리, Reverse Geocoding(주소 변환)
+- **NAVER Search API**: 지역 검색 정보를 바탕으로 식당 목록 및 카테고리 수집
+- **Browser Geolocation API**: 사용자 현재 위치 좌표 획득
 
 ## 📖 사용 방법
 
