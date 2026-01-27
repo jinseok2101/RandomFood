@@ -391,7 +391,7 @@ export default function Home() {
             title="내 위치로 이동"
             style={{
               position: "absolute",
-              bottom: "150px", // 하단 뽑기 버튼 위쪽으로 적절히 배치
+              bottom: "300px", // 하단 뽑기 버튼 위쪽으로 적절히 배치
               left: "20px",
               width: "45px",
               height: "45px",
