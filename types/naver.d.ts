@@ -31,10 +31,12 @@ declare namespace naver.maps {
     mapTypeId?: string;
     minZoom?: number;
     maxZoom?: number;
-    logoControl?: boolean; // 💡 추가
-    mapDataControl?: boolean; // 💡 추가
-    zoomControl?: boolean; // 💡 추가
-    scaleControl?: boolean; // 💡 추가
+    logoControl?: boolean;
+    mapDataControl?: boolean;
+    zoomControl?: boolean;
+    scaleControl?: boolean;
+    locationButton?: boolean;
+    locationButtonOptions?: any;
   }
 
   export class Marker {
@@ -43,8 +45,8 @@ declare namespace naver.maps {
     getMap(): Map | null;
     setPosition(latlng: LatLng): void;
     getPosition(): LatLng;
-    set(key: string, value: any): void; // 💡 추가
-    get(key: string): any; // 💡 추가
+    set(key: string, value: any): void;
+    get(key: string): any;
   }
   export class InfoWindow {
     constructor(options: any);
@@ -64,7 +66,7 @@ declare namespace naver.maps {
 
     export function reverseGeocode(
       options: any,
-      callback: (status: Status, response: any) => void
+      callback: (status: Status, response: any) => void,
     ): void;
   }
 
@@ -86,7 +88,7 @@ declare namespace naver.maps {
     export function addListener(
       target: any,
       type: string,
-      listener: (e?: any) => void
+      listener: (e?: any) => void,
     ): void;
 
     export function trigger(target: any, type: string, ...args: any[]): void; // 💡 trigger 추가

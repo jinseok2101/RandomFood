@@ -48,7 +48,6 @@ export default function Home() {
 
   const NCP_MAPS_CLIENT_ID = process.env.NEXT_PUBLIC_NCP_MAPS_CLIENT_ID;
 
-  // ⭐ 카테고리 텍스트를 분석하여 적절한 이미지를 반환하는 함수
   const getFallbackImage = (category: string) => {
     if (category.includes("한식")) return CATEGORY_IMAGES["한식"];
     if (category.includes("일식") || category.includes("돈가스"))
@@ -107,8 +106,8 @@ export default function Home() {
           try {
             const res = await fetch(
               `/api/search?query=${encodeURIComponent(
-                address + " " + k
-              )}&display=50`
+                address + " " + k,
+              )}&display=50`,
             );
             const items = await res.json();
             if (!Array.isArray(items)) continue;
@@ -127,8 +126,6 @@ export default function Home() {
                   ? Number(item.mapx) / 10000000
                   : Number(item.mapx);
               const cleanTitle = getCleanTitle(item.title);
-
-              // ⭐ 카테고리에 맞는 기본 이미지 할당
               const imageUrl = getFallbackImage(item.category);
 
               const marker = new window.naver.maps.Marker({
@@ -138,7 +135,7 @@ export default function Home() {
                   : null,
                 icon: {
                   content: `<div style="width:14px; height:14px; background:${getCategoryColor(
-                    item.category
+                    item.category,
                   )}; border:2px solid white; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.3); cursor:pointer;"></div>`,
                   anchor: new window.naver.maps.Point(7, 7),
                 },
@@ -148,23 +145,46 @@ export default function Home() {
                 setPickedStore({
                   title: cleanTitle,
                   category: item.category,
-                  imageUrl: imageUrl, // 이미지 추가
+                  imageUrl: imageUrl,
                   url: `https://map.naver.com/v5/search/${encodeURIComponent(
-                    cleanTitle
+                    cleanTitle,
                   )}`,
                 });
               });
 
               marker.set("title", cleanTitle);
               marker.set("category", item.category);
-              marker.set("imageUrl", imageUrl); // 마커 객체에도 저장
+              marker.set("imageUrl", imageUrl);
               markersRef.current.push(marker);
             });
           } catch (e) {
             console.error(e);
           }
         }
-      }
+      },
+    );
+  };
+
+  // ⭐ 내 위치로 지도 이동시키는 함수 (커스텀 버튼용)
+  const handleMoveToMyLocation = () => {
+    if (!mapInstance.current) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const myPos = new window.naver.maps.LatLng(
+          p.coords.latitude,
+          p.coords.longitude,
+        );
+        mapInstance.current.panTo(myPos); // 부드럽게 이동
+
+        // 내 위치 파란색 마커 위치 업데이트
+        if (myMarkerRef.current) {
+          myMarkerRef.current.setPosition(myPos);
+        }
+      },
+      (err) => {
+        alert("위치 정보를 가져올 수 없습니다. 권한을 확인해주세요.");
+      },
     );
   };
 
@@ -175,7 +195,7 @@ export default function Home() {
         m.getMap() !== null &&
         mapInstance.current
           .getProjection()
-          .getDistance(center, m.getPosition()) <= radius
+          .getDistance(center, m.getPosition()) <= radius,
     );
 
     if (available.length === 0) return alert("주변에 음식점이 없습니다.");
@@ -194,7 +214,7 @@ export default function Home() {
           category: target.get("category"),
           imageUrl: target.get("imageUrl"),
           url: `https://map.naver.com/v5/search/${encodeURIComponent(
-            target.get("title")
+            target.get("title"),
           )}`,
         });
       }
@@ -214,7 +234,7 @@ export default function Home() {
       (p) => {
         const myPos = new window.naver.maps.LatLng(
           p.coords.latitude,
-          p.coords.longitude
+          p.coords.longitude,
         );
         map.setCenter(myPos);
         myMarkerRef.current = new window.naver.maps.Marker({
@@ -228,11 +248,11 @@ export default function Home() {
         });
         fetchRestaurants(map);
       },
-      () => fetchRestaurants(map)
+      () => fetchRestaurants(map),
     );
 
     window.naver.maps.Event.addListener(map, "idle", () =>
-      fetchRestaurants(map)
+      fetchRestaurants(map),
     );
   }, [scriptLoaded]);
 
@@ -276,6 +296,7 @@ export default function Home() {
 
       {!worldCupMode && (
         <>
+          {/* 상단 필터 영역 */}
           <div
             style={{
               position: "absolute",
@@ -287,6 +308,7 @@ export default function Home() {
               gap: "10px",
             }}
           >
+            {/* 반경 선택 버튼 */}
             <div
               style={{
                 display: "flex",
@@ -321,6 +343,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {/* 카테고리 선택 버튼 */}
             <div
               style={{
                 display: "flex",
@@ -342,8 +365,8 @@ export default function Home() {
                       m.setMap(
                         checkCategory(m.get("category"), cat)
                           ? mapInstance.current
-                          : null
-                      )
+                          : null,
+                      ),
                     );
                   }}
                   style={{
@@ -363,6 +386,52 @@ export default function Home() {
             </div>
           </div>
 
+          <button
+            onClick={handleMoveToMyLocation}
+            title="내 위치로 이동"
+            style={{
+              position: "absolute",
+              bottom: "60px", // 하단 뽑기 버튼 위쪽으로 적절히 배치
+              left: "20px",
+              width: "45px",
+              height: "45px",
+              borderRadius: "8px", // 약간 각진 둥근 사각형 (지도 앱 스타일)
+              backgroundColor: "white",
+              border: "1px solid rgba(0,0,0,0.1)",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              cursor: "pointer",
+              zIndex: 100,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background-color 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f8f9fa")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "white")
+            }
+          >
+            {/* GPS 아이콘 모양의 SVG (이모지보다 훨씬 깔끔합니다) */}
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 8V12M12 12V16M12 12H16M12 12H8M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z"
+                stroke="#333"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <circle cx="12" cy="12" r="2" fill="#333" />
+            </svg>
+          </button>
+
+          {/* 하단 월드컵/뽑기 버튼 영역 */}
           <div
             style={{
               position: "absolute",
@@ -387,9 +456,9 @@ export default function Home() {
                       category: m.get("category"),
                       imageUrl: m.get("imageUrl"),
                       url: `https://map.naver.com/v5/search/${encodeURIComponent(
-                        m.get("title")
+                        m.get("title"),
                       )}`,
-                    }))
+                    })),
                 )
               }
               style={{
@@ -427,6 +496,7 @@ export default function Home() {
         </>
       )}
 
+      {/* 결과 창 팝업 */}
       {pickedStore && (
         <div
           style={{
@@ -444,7 +514,6 @@ export default function Home() {
             textAlign: "center",
           }}
         >
-          {/* ⭐ 결과창에도 카테고리 이미지 표시 */}
           <div
             style={{
               width: "100%",
