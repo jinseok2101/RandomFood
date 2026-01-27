@@ -391,11 +391,11 @@ export default function Home() {
             title="내 위치로 이동"
             style={{
               position: "absolute",
-              bottom: "500px", // 하단 뽑기 버튼 위쪽으로 적절히 배치
+              bottom: "400px",
               left: "20px",
               width: "45px",
               height: "45px",
-              borderRadius: "8px", // 약간 각진 둥근 사각형 (지도 앱 스타일)
+              borderRadius: "8px",
               backgroundColor: "white",
               border: "1px solid rgba(0,0,0,0.1)",
               boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
