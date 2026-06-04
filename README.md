@@ -27,6 +27,10 @@
 - **NAVER Search API**: 지역 검색 정보를 바탕으로 식당 목록 및 카테고리 수집
 - **Browser Geolocation API**: 사용자 현재 위치 좌표 획득
 
+## 시스템 아키텍처
+<img width="2408" height="2612" alt="시스템 아키텍처" src="https://github.com/user-attachments/assets/59015f4f-fc9b-4516-83bb-89dca5386bea" />
+
+
 ## 📖 사용 방법
 
 1. **위치 권한 허용**: 브라우저에서 위치 정보 접근을 허용하면 자동으로 주변 식당을 불러옵니다.
